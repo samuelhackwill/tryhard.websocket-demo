@@ -1,0 +1,102 @@
+// Import the WebSocket library
+const WebSocket = require("ws")
+
+// Create a WebSocket server
+const wss = new WebSocket.Server({ port: 8080 })
+const PING_INTERVAL = 5000
+
+console.log("WebSocket server is running on ws://localhost:8080")
+
+// Array to hold HTML client(s)
+let htmlClients = []
+
+// Event: Connection established
+wss.on("connection", (ws, req) => {
+  console.log("New client connected")
+
+  // Track if the client is alive
+  ws.isAlive = true
+
+  // Determine if the client is an HTML client or Raspberry Pi (based on User-Agent)
+  const isHTMLClient = req.headers["user-agent"]?.includes("Chrome") // Basic check for HTML client
+
+  if (isHTMLClient) {
+    // If it's an HTML client, add it to the list of clients
+    htmlClients.push(ws)
+    console.log("HTML client connected")
+
+    // Send a welcome message to the HTML client
+    ws.send('{"welcome":"true"}')
+
+    // Event: Message received from the HTML client (optional)
+    ws.on("message", (message) => {
+      console.log(`Received from HTML client: ${message}`)
+    })
+
+    // Event: Client disconnected
+    ws.on("close", () => {
+      console.log("HTML client disconnected")
+      htmlClients = htmlClients.filter((client) => client !== ws) // Remove from list
+    })
+
+    // Event: Error
+    ws.on("error", (error) => {
+      console.error("WebSocket error:", error)
+    })
+
+    // Respond to pong messages from the client
+    ws.on("pong", () => {
+      console.log("Received pong from client")
+      ws.isAlive = true
+    })
+  } else {
+    // If it's a Raspberry Pi or another sending device, listen for data but do not add to htmlClients
+    console.log("Raspberry Pi connected. Waiting for mouse event data...")
+
+    ws.on("message", (message) => {
+      try {
+        const data = JSON.parse(message)
+        console.log(data)
+        // Forward the received data only to HTML clients
+        htmlClients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(data)) // Send mouse event data to HTML clients
+          }
+        })
+      } catch (error) {
+        console.error("Error processing Raspberry Pi data:", error)
+      }
+    })
+
+    // Handle disconnection from the Raspberry Pi (if it closes)
+    ws.on("close", () => {
+      console.log("Raspberry Pi disconnected")
+    })
+  }
+
+  // Respond to pong messages from the client
+  ws.on("pong", () => {
+    console.log("Received pong from client")
+    ws.isAlive = true
+  })
+})
+
+// Periodically send pings and check for unresponsive clients
+const interval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    console.log(ws.isAlive)
+    if (!ws.isAlive) {
+      console.log("Client is unresponsive. Terminating connection.")
+      return ws.terminate()
+    }
+
+    ws.isAlive = false // Mark the client as unresponsive
+    ws.ping() // Send a ping
+    console.log("Ping sent to client")
+  })
+}, PING_INTERVAL)
+
+// Cleanup on server shutdown
+wss.on("close", () => {
+  clearInterval(interval)
+})

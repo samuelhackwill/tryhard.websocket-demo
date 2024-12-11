@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic Mouse Cursors</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      let img
+      let mouseCursors = {} // Object to store mouse cursor positions by device ID
+      // Load the image.
+      function preload() {
+        img = loadImage("/cursor.png")
+      }
+
+      function setup() {
+        // Load the image.
+        createCanvas(windowWidth, windowHeight)
+        noStroke()
+
+        // Connect to the WebSocket server
+        const ws = new WebSocket("ws://localhost:8080")
+
+        ws.onopen = () => {
+          console.log("Connected to WebSocket server")
+        }
+
+        ws.onmessage = (event) => {
+          // Parse the incoming JSON data
+          const data = JSON.parse(event.data)
+
+          // est ce qu'on a déjà une mémoire pour ce device?
+          if (data.device) {
+            if (!(data.device in mouseCursors)) {
+              // si non, initialise le
+              mouseCursors[data.device] = { coords: { x: 0, y: 0 } }
+            }
+          }
+
+          // soit c'est un mouvement en X soit c'est un mouvement en Y
+          console.log(mouseCursors[data.device])
+
+          switch (data.code) {
+            case "REL_X":
+              mouseCursors[data.device].coords.x = mouseCursors[data.device].coords.x + data.value
+              break
+            case "REL_Y":
+              mouseCursors[data.device].coords.y = mouseCursors[data.device].coords.y + data.value
+              break
+
+            default:
+              console.log("unknown event code")
+              break
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error)
+        }
+
+        ws.onclose = () => {
+          console.log("WebSocket connection closed")
+        }
+      }
+
+      function draw() {
+        background(255)
+
+        // Draw each cursor on the canvas
+        for (let device in mouseCursors) {
+          const cursor = mouseCursors[device]
+          fill(0, 0, 0, 150) // Set color for the cursor (blue with transparency)
+          image(img, mouseCursors[device].coords.x / 3, mouseCursors[device].coords.y / 3, 32, 50)
+        }
+      }
+
+      function windowResized() {
+        resizeCanvas(windowWidth, windowHeight)
+      }
+      function update() {
+        // do stuff like rendering and dancing
+
+        fps.frame()
+
+        requestAnimationFrame(update)
+      }
+    </script>
+  </body>
+</html>

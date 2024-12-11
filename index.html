@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mouse Tracker</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        padding: 20px;
+      }
+      #status {
+        font-size: 1.5em;
+        margin-bottom: 20px;
+      }
+      #mouseCount {
+        font-size: 2em;
+        color: green;
+      }
+      #error {
+        color: red;
+      }
+      span {
+        background-color: lightblue;
+        margin: 5px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      table,
+      th,
+      td {
+        border: 1px solid black;
+      }
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Connecting to WebSocket...</div>
+
+    <h1>Connected Clients and Devices</h1>
+
+    <table id="clientsTable">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Devices</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Dynamic content will be added here -->
+      </tbody>
+    </table>
+
+    <div id="error"></div>
+
+    <script>
+      // Update the URI to match your JS WebSocket server's address
+      const serverUri = "ws://localhost:8080"
+      const statusDiv = document.getElementById("status")
+      const mouseCountDiv = document.getElementById("mouseCount")
+      const errorDiv = document.getElementById("error")
+
+      const clients = {}
+
+      let connectedDevices = new Set() // Keep track of unique devices
+
+      function updateMouseCount() {
+        mouseCountDiv.textContent = connectedDevices.size
+      }
+
+      function connectWebSocket() {
+        const ws = new WebSocket(serverUri)
+
+        ws.onopen = () => {
+          statusDiv.textContent = `Connected to WebSocket server ${serverUri}`
+          errorDiv.textContent = "" // Clear any previous error messages
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data) // Assuming data from server is JSON
+            if (data.client && data.device) {
+              handleClientDeviceData(data.client, data.device)
+            }
+          } catch (error) {
+            console.error("Error processing message:", error)
+          }
+        }
+
+        ws.onclose = () => {
+          statusDiv.textContent = "Disconnected. Attempting to reconnect..."
+          setTimeout(connectWebSocket, 3000) // Reconnect after 3 seconds
+        }
+
+        ws.onerror = (error) => {
+          errorDiv.textContent = "WebSocket error. Check the console for details."
+          console.error("WebSocket error:", error)
+        }
+      }
+
+      // Start the WebSocket connection
+      connectWebSocket()
+
+      // Function to handle client and device data
+      function handleClientDeviceData(client, device) {
+        // If the client is new, add a row for them
+        if (!clients[client]) {
+          const row = document.createElement("tr")
+          row.id = client // Set client ID as the row's ID
+          const clientCell = document.createElement("td")
+          clientCell.textContent = client
+          const devicesCell = document.createElement("td")
+          devicesCell.id = `devices-${client}` // To reference the devices cell for this client
+          row.appendChild(clientCell)
+          row.appendChild(devicesCell)
+          document.getElementById("clientsTable").querySelector("tbody").appendChild(row)
+          clients[client] = { row, devices: {} } // Store client info
+        }
+
+        // Get the client's row and devices cell
+        const clientRow = clients[client].row
+        const devicesCell = document.getElementById(`devices-${client}`)
+
+        // If the device is new, add it as a column in the client's row
+        if (!clients[client].devices[device]) {
+          const deviceColumn = document.createElement("span")
+          deviceColumn.textContent = device
+          devicesCell.appendChild(deviceColumn)
+          clients[client].devices[device] = device // Mark device as added for this client
+        }
+      }
+    </script>
+  </body>
+</html>
