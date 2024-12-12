@@ -1,87 +1,152 @@
 import asyncio
+from evdev import InputDevice, ecodes
+import glob
 import random
 import websockets
 import socket
 import json
+import sys
+import time
 
-async def generate_fake_device_data(queue, device_id):
-    """Simulate mouse movement data for a fake device."""
-    hostname = socket.gethostname()  # Get the host name of the device
-    xOrY = ["REL_Y", "REL_X"]
-    while True:
-        # Generate random relative X and Y movements
-        data = {
-            "client": hostname,
-            "device": f"simulatedMouse_{device_id}",
-            "event_type": "motion",
-            "code": xOrY[random.randint(0, 1)],
-            "value": random.randint(-10, 10)          
-            }
-        await queue.put(data)  # Add the data to the queue
-        await asyncio.sleep(1 / 50)  # 50 signals per second
+DEVICES_PATH = "/dev/input/by-id"
+raspName = socket.gethostname()
 
-async def simulate_devices(queue, num_devices):
-    """Simulate multiple fake devices generating data."""
-    tasks = [asyncio.create_task(generate_fake_device_data(queue, i)) for i in range(num_devices)]
+async def simulate_mouse_events(queue):
+    """Simulate mouse events from four virtual devices."""
+    simulated_devices = [f"simulatedMouse-{i}" for i in range(1, 5)]
+    print(f"Simulating {len(simulated_devices)} devices...")
+
+    async def generate_events(device_name):
+        while True:
+            await asyncio.sleep(1 / 120)  # 120 Hz
+            x_movement = random.randint(-10, 10)
+            y_movement = random.randint(-10, 10)
+
+            await queue.put({
+                "rasp": raspName,
+                "client": f"{raspName}_{device_name}",
+                "event_type": "motion",
+                "x": x_movement,
+                "y": y_movement
+            })
+
+    tasks = [asyncio.create_task(generate_events(device)) for device in simulated_devices]
     await asyncio.gather(*tasks)
 
 async def send_to_websocket(queue, server_uri):
     """Connect to the WebSocket server and send mouse events."""
     while True:
         try:
-            # Attempt to connect to the WebSocket server
             async with websockets.connect(
                 server_uri,
-                ping_interval=5,  # Adjust to match server's ping interval
-                ping_timeout=10   # Timeout for ping responses
+                ping_interval=5,
+                ping_timeout=10
             ) as websocket:
                 print(f"Connected to WebSocket server at {server_uri}")
-                
+
                 async def handle_pings():
                     """Handle incoming ping messages."""
                     while True:
                         try:
-                            await websocket.recv()  # Wait for any messages (e.g., pings)
+                            await websocket.recv()
                         except websockets.ConnectionClosed:
                             print("Connection closed during ping handling.")
                             break
 
-                # Start the ping handler
                 asyncio.create_task(handle_pings())
-            
+
                 while True:
-                    # Get data from the queue
                     data = await queue.get()
-                    
-                    # Convert the data to JSON and send it
                     json_data = json.dumps(data)
                     await websocket.send(json_data)
                     print(f"Sent data to server: {json_data}")
 
         except websockets.ConnectionClosedError as e:
             print(f"Connection closed unexpectedly: {e}")
-            await asyncio.sleep(5)  # Wait before reconnecting
-
+            await asyncio.sleep(5)
         except Exception as e:
             print(f"Unexpected error: {e}")
-            await asyncio.sleep(5)  # Wait before reconnecting
+            await asyncio.sleep(5)
+
+
+async def read_mouse_events(device_path, motion_aggregator):
+    """Read mouse events from a specific device."""
+    device = InputDevice(device_path)
+    unique_id = f"{raspName}_{device.name}"
+    print(f"Listening on device: {device.name} ({device.path})")
+    
+    if unique_id not in motion_aggregator:
+        motion_aggregator[unique_id] = {"x": 0, "y": 0}
+    
+    async for event in device.async_read_loop():
+        if event.type == ecodes.EV_REL:
+            if event.code == ecodes.REL_X:
+                motion_aggregator[unique_id]['x'] += event.value
+            elif event.code == ecodes.REL_Y:
+                motion_aggregator[unique_id]['y'] += event.value
+        elif event.type == ecodes.EV_KEY:  # Button press or release
+            await motion_aggregator['queue'].put({
+                "rasp": raspName,
+                "client": unique_id,
+                "event_type": "button",
+                "code": ecodes.BTN[event.code],
+                "value": "pressed" if event.value == 1 else "released"
+            })
+        elif event.type == ecodes.EV_REL and event.code in (ecodes.REL_WHEEL, ecodes.REL_HWHEEL):
+            direction = "up" if event.value > 0 else "down"
+            if event.code == ecodes.REL_HWHEEL:
+                direction = "right" if event.value > 0 else "left"
+            await motion_aggregator['queue'].put({
+                "rasp": raspName,
+                "client": unique_id,
+                "event_type": "wheel",
+                "code": ecodes.REL[event.code],
+                "value": direction
+            })
+
+async def monitor_mice(queue):
+    """Monitor all connected mice under /dev/input/by-id."""
+    mice_tasks = []
+    motion_aggregator = {"queue": queue}
+    for device_path in glob.glob(f"{DEVICES_PATH}/*-event-mouse"):
+        mice_tasks.append(asyncio.create_task(read_mouse_events(device_path, motion_aggregator)))
+    print(f"Monitoring {len(mice_tasks)} mice...")
+    
+    async def flush_motion():
+        """Send aggregated motion events at a fixed rate."""
+        while True:
+            await asyncio.sleep(1 / 120)  # 120 Hz
+            for unique_id, motion in motion_aggregator.items():
+                if unique_id == "queue":  # Skip the queue key
+                    continue
+                if motion['x'] != 0 or motion['y'] != 0:
+                    await queue.put({
+                        "rasp": raspName,
+                        "client": unique_id,
+                        "event_type": "motion",
+                        "x": motion['x'],
+                        "y": motion['y']
+                    })
+                    motion['x'] = 0
+                    motion['y'] = 0
+
+    mice_tasks.append(asyncio.create_task(flush_motion()))
+    await asyncio.gather(*mice_tasks)
 
 
 async def main():
     queue = asyncio.Queue()
+    server_uri = "ws://192.168.1.64:8080"
 
-    # Replace with the WebSocket server's IP and port
-    server_uri = "ws://192.168.1.64:8080"  # Example: ws://192.168.1.100:8080
+    if len(sys.argv) > 1 and sys.argv[1] == "simulate":
+        print("Running in simulation mode.")
+        mice_task = asyncio.create_task(simulate_mouse_events(queue))
+    else:
+        print("Running in real device mode.")
+        mice_task = asyncio.create_task(monitor_mice(queue))
 
-    # Start simulating devices
-    num_devices = 4  # Number of fake devices
-    device_simulation_task = asyncio.create_task(simulate_devices(queue, num_devices))
-
-    # Start sending data to the WebSocket server
     websocket_task = asyncio.create_task(send_to_websocket(queue, server_uri))
-
-    # Wait for both tasks to complete (they won't unless interrupted)
-    await asyncio.gather(device_simulation_task, websocket_task)
+    await asyncio.gather(mice_task, websocket_task)
 
 if __name__ == "__main__":
     asyncio.run(main())

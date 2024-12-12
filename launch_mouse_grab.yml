@@ -1,0 +1,17 @@
+---
+- name: Deploy and launch mouse-grabr script
+  hosts: thRasps
+  user: sam
+  gather_facts: no
+  tasks:
+    - name: Ping all devices
+      ping:
+      register: ping_result
+      failed_when: ping_result is undefined # Mark unresponsive hosts as failed
+
+    - name: Launch mouse-grabr.py using python3
+      ansible.builtin.shell: |
+        nohup python3 /home/sam/Desktop/mouse-grabr.py &
+      args:
+        executable: /bin/bash
+      when: ping_result is not failed

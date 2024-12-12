@@ -5,10 +5,32 @@ const WebSocket = require("ws")
 const wss = new WebSocket.Server({ port: 8080 })
 const PING_INTERVAL = 5000
 
+queue = []
+
 console.log("WebSocket server is running on ws://localhost:8080")
 
 // Array to hold HTML client(s)
 let htmlClients = []
+
+addToQueue = function (data) {
+  queue.push(data)
+}
+
+mergeQueue = function (objectsArray) {
+  const merged = {}
+
+  objectsArray.forEach((obj) => {
+    const client = obj.client
+    if (!merged[client]) {
+      merged[client] = { client: client, x: 0, y: 0 }
+    }
+    merged[client].x += obj.x || 0
+    merged[client].y += obj.y || 0
+  })
+  queue = []
+
+  return Object.values(merged)
+}
 
 // Event: Connection established
 wss.on("connection", (ws, req) => {
@@ -56,16 +78,23 @@ wss.on("connection", (ws, req) => {
     ws.on("message", (message) => {
       try {
         const data = JSON.parse(message)
-        console.log(data)
-        // Forward the received data only to HTML clients
-        htmlClients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data)) // Send mouse event data to HTML clients
-          }
-        })
+        addToQueue(data)
       } catch (error) {
         console.error("Error processing Raspberry Pi data:", error)
       }
+      // try {
+      //   const data = JSON.parse(message)
+      //   // console.log(data)
+      //   data.timestamp_SERVER = Date.now()
+      //   // Forward the received data only to HTML clients
+      //   htmlClients.forEach((client) => {
+      //     if (client.readyState === WebSocket.OPEN) {
+      //       client.send(JSON.stringify(data)) // Send mouse event data to HTML clients
+      //     }
+      //   })
+      // } catch (error) {
+      //   console.error("Error processing Raspberry Pi data:", error)
+      // }
     })
 
     // Handle disconnection from the Raspberry Pi (if it closes)
@@ -100,3 +129,12 @@ const interval = setInterval(() => {
 wss.on("close", () => {
   clearInterval(interval)
 })
+
+setInterval(() => {
+  htmlClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      cleanData = mergeQueue(queue)
+      client.send(JSON.stringify(cleanData)) // Send mouse event data to HTML clients
+    }
+  })
+}, 1000 / 120)

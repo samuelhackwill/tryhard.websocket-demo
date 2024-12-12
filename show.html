@@ -15,6 +15,12 @@
   </head>
   <body>
     <script>
+      let msg = NaN
+      let msgperseccounter = 0
+      let dropped = false
+      let droppedDuration = 0
+      let droppedCollection = []
+      let maxDrop = 0
       let img
       let mouseCursors = {} // Object to store mouse cursor positions by device ID
       // Load the image.
@@ -22,10 +28,40 @@
         img = loadImage("/cursor.png")
       }
 
+      setInterval(function () {
+        // console.log("messages per second ", msgperseccounter)
+        msg = msgperseccounter
+        msgperseccounter = 0
+      }, 1000)
+
+      setInterval(function () {
+        // check if you have gotten a new message. if so,
+        if (dropped) {
+          droppedDuration++
+        } else {
+          droppedCollection.push(droppedDuration)
+          droppedDuration = 0
+          dropped = true
+          maxDrop = Math.max(...droppedCollection)
+        }
+        // add number to highscore array and
+        // reset counter.
+        // if not, add 1 to counter
+        // always display biggest number
+      }, 1)
+
       function setup() {
         // Load the image.
         createCanvas(windowWidth, windowHeight)
         noStroke()
+        let button = createButton("reset maxDrop")
+        button.position(300, 50)
+
+        // Call repaint() when the button is pressed.
+        button.mousePressed(function () {
+          droppedCollection = []
+          maxDrop = 0
+        })
 
         // Connect to the WebSocket server
         const ws = new WebSocket("ws://localhost:8080")
@@ -35,32 +71,61 @@
         }
 
         ws.onmessage = (event) => {
+          dropped = false
+          msgperseccounter++
           // Parse the incoming JSON data
           const data = JSON.parse(event.data)
+          // data.timestamp_CLIENT = Date.now()
+          // console.log(data)
 
-          // est ce qu'on a déjà une mémoire pour ce device?
-          if (data.device) {
-            if (!(data.device in mouseCursors)) {
-              // si non, initialise le
-              mouseCursors[data.device] = { coords: { x: 0, y: 0 } }
-            }
+          if (data.length > 0) {
+            data.forEach((instruction) => {
+              // check if he is logged in the posxy array
+              // if hes not initialise le
+              // if he is, just add the acceleration to the pos
+              // console.log(instruction.client)
+              if (!(instruction.client in mouseCursors)) {
+                mouseCursors[instruction.client] = { coords: { x: 1000, y: 1000 } }
+              } else {
+                mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
+                mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
+              }
+            })
           }
 
-          // soit c'est un mouvement en X soit c'est un mouvement en Y
-          console.log(mouseCursors[data.device])
+          // // est ce qu'on a déjà une mémoire pour ce device?
+          // if (id != "undefined_undefined" || id == undefined) {
+          //   if (!(id in mouseCursors)) {
+          //     // si non, initialise le
+          //     mouseCursors[id] = { coords: { x: 1000, y: 1000 } }
+          //   }
 
-          switch (data.code) {
-            case "REL_X":
-              mouseCursors[data.device].coords.x = mouseCursors[data.device].coords.x + data.value
-              break
-            case "REL_Y":
-              mouseCursors[data.device].coords.y = mouseCursors[data.device].coords.y + data.value
-              break
+          // // latency between rasp & serv DOES NOT WORK! we're getting negative numbers... wtf
 
-            default:
-              console.log("unknown event code")
-              break
-          }
+          // console.log("R", data.timestamp_RASP, " S", data.timestamp_SERVER)
+          // const raspServLag = data.timestamp_SERVER - data.timestamp_RASP
+          // // console.log("raspLag ", raspServLag)
+          // const servClientLag = data.timestamp_CLIENT - data.timestamp_SERVER
+          // const totalLatency = raspServLag + servClientLag
+          // // console.log(totalLatency)
+          // // latency between serv & client
+          // mouseCursors[id].latency = totalLatency
+          // }
+
+          // on ajoute a un tableau qui sera vidé à 60Hz
+
+          // switch (data.code) {
+          //   case "REL_X":
+          //     mouseCursors[id].coords.x = mouseCursors[id].coords.x + data.value
+          //     break
+          //   case "REL_Y":
+          //     mouseCursors[id].coords.y = mouseCursors[id].coords.y + data.value
+          //     break
+
+          //   default:
+          //     // console.log("unknown event code")
+          //     break
+          // }
         }
 
         ws.onerror = (error) => {
@@ -74,24 +139,22 @@
 
       function draw() {
         background(255)
+        // text("la latence est exprimée en milisecondes entre le moment où l'evenement est simulé côté rasp et le moment où il est reçu côté client JS. La majorité de la latence est entre les rasp & le serveur.", 10, 10, 200, 200)
+
+        text("messages recieved " + msg + "/s", 200, 10, 100, 100)
+        text("max drop " + maxDrop, 300, 10, 200, 200)
 
         // Draw each cursor on the canvas
-        for (let device in mouseCursors) {
-          const cursor = mouseCursors[device]
+        for (let client in mouseCursors) {
+          const cursor = mouseCursors[client]
           fill(0, 0, 0, 150) // Set color for the cursor (blue with transparency)
-          image(img, mouseCursors[device].coords.x / 3, mouseCursors[device].coords.y / 3, 32, 50)
+          image(img, cursor.coords.x / 3, cursor.coords.y / 3, 32, 50)
+          // text(mouseCursors[id].latency + " ms", mouseCursors[id].coords.x / 3, mouseCursors[id].coords.y / 3)
         }
       }
 
       function windowResized() {
         resizeCanvas(windowWidth, windowHeight)
-      }
-      function update() {
-        // do stuff like rendering and dancing
-
-        fps.frame()
-
-        requestAnimationFrame(update)
       }
     </script>
   </body>
