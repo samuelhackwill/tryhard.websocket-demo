@@ -17,9 +17,24 @@
       when: ping_result is not failed
       become: yes
 
-    - name: Install python3-websockets
+    - name: Install python3-websockets and evdev
       ansible.builtin.apt:
-        name: python3-websockets
+        name:
+          - python3-websockets
+          - python3-evdev
         state: present
       when: ping_result is not failed
       become: yes
+
+    - name: Verify dependencies
+      ansible.builtin.shell: |
+        python3 -c "
+        import asyncio, random, websockets, socket, json, sys
+        print('All dependencies are installed and importable.')
+        "
+      register: dependency_check
+      failed_when: dependency_check.rc != 0
+
+    - name: Debug dependency check
+      ansible.builtin.debug:
+        var: dependency_check.stdout

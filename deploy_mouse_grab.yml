@@ -19,7 +19,7 @@
 
     - name: Launch mouse-grabr.py using python3
       ansible.builtin.shell: |
-        nohup python3 /home/sam/Desktop/mouse-grabr.py &
+        nohup python3 /home/sam/Desktop/mouse-grabr.py simulate &
       args:
         executable: /bin/bash
       when: ping_result is not failed
