@@ -1,5 +1,5 @@
 ---
-- name: launch mouse-grabr SIMULATE script
+- name: launch mouse-grabr script in SIMULATION MODE
   hosts: thRasps
   user: sam
   gather_facts: no

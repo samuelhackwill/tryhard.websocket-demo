@@ -1,5 +1,5 @@
 ---
-- name: Deploy and launch mouse-grabr script
+- name: Deploy mouse-grabr script on /Desktop
   hosts: thRasps
   user: sam
   gather_facts: no
@@ -15,11 +15,4 @@
         dest: /home/sam/Desktop/mouse-grabr.py
         owner: sam
         mode: "0755"
-      when: ping_result is not failed
-
-    - name: Launch mouse-grabr.py using python3
-      ansible.builtin.shell: |
-        nohup python3 /home/sam/Desktop/mouse-grabr.py simulate &
-      args:
-        executable: /bin/bash
       when: ping_result is not failed

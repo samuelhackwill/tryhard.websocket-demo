@@ -21,11 +21,13 @@ mergeQueue = function (objectsArray) {
 
   objectsArray.forEach((obj) => {
     const client = obj.client
+    const timestamp = obj.timestamp_rasp
     if (!merged[client]) {
-      merged[client] = { client: client, x: 0, y: 0 }
+      merged[client] = { client: client, x: 0, y: 0, timestamp_rasp: timestamp }
     }
     merged[client].x += obj.x || 0
     merged[client].y += obj.y || 0
+    merged[client].timestamp_rasp = timestamp
   })
   queue = []
 
@@ -134,7 +136,8 @@ setInterval(() => {
   htmlClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       cleanData = mergeQueue(queue)
+      console.log(cleanData)
       client.send(JSON.stringify(cleanData)) // Send mouse event data to HTML clients
     }
   })
-}, 1000 / 120)
+}, 1000 / 20)

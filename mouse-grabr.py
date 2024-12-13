@@ -18,7 +18,7 @@ async def simulate_mouse_events(queue):
 
     async def generate_events(device_name):
         while True:
-            await asyncio.sleep(1 / 120)  # 120 Hz
+            await asyncio.sleep(1 / 60)  # 60 Hz
             x_movement = random.randint(-10, 10)
             y_movement = random.randint(-10, 10)
 
@@ -27,7 +27,8 @@ async def simulate_mouse_events(queue):
                 "client": f"{raspName}_{device_name}",
                 "event_type": "motion",
                 "x": x_movement,
-                "y": y_movement
+                "y": y_movement,
+                "timestamp_rasp": int(round(time.time() * 1000))
             })
 
     tasks = [asyncio.create_task(generate_events(device)) for device in simulated_devices]
@@ -59,7 +60,7 @@ async def send_to_websocket(queue, server_uri):
                     data = await queue.get()
                     json_data = json.dumps(data)
                     await websocket.send(json_data)
-                    print(f"Sent data to server: {json_data}")
+                    # print(f"Sent data to server: {json_data}")
 
         except websockets.ConnectionClosedError as e:
             print(f"Connection closed unexpectedly: {e}")
@@ -90,7 +91,8 @@ async def read_mouse_events(device_path, motion_aggregator):
                 "client": unique_id,
                 "event_type": "button",
                 "code": ecodes.BTN[event.code],
-                "value": "pressed" if event.value == 1 else "released"
+                "value": "pressed" if event.value == 1 else "released",
+                "timestamp_rasp": int(round(time.time() * 1000))
             })
         elif event.type == ecodes.EV_REL and event.code in (ecodes.REL_WHEEL, ecodes.REL_HWHEEL):
             direction = "up" if event.value > 0 else "down"
@@ -101,7 +103,8 @@ async def read_mouse_events(device_path, motion_aggregator):
                 "client": unique_id,
                 "event_type": "wheel",
                 "code": ecodes.REL[event.code],
-                "value": direction
+                "value": direction,
+                "timestamp_rasp": int(round(time.time() * 1000))
             })
 
 async def monitor_mice(queue):
@@ -115,7 +118,7 @@ async def monitor_mice(queue):
     async def flush_motion():
         """Send aggregated motion events at a fixed rate."""
         while True:
-            await asyncio.sleep(1 / 120)  # 120 Hz
+            await asyncio.sleep(1 / 60)  # 60 Hz
             for unique_id, motion in motion_aggregator.items():
                 if unique_id == "queue":  # Skip the queue key
                     continue
@@ -125,7 +128,8 @@ async def monitor_mice(queue):
                         "client": unique_id,
                         "event_type": "motion",
                         "x": motion['x'],
-                        "y": motion['y']
+                        "y": motion['y'],
+                        "timestamp_rasp": int(round(time.time() * 1000))
                     })
                     motion['x'] = 0
                     motion['y'] = 0

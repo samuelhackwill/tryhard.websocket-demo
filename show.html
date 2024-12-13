@@ -80,52 +80,23 @@
 
           if (data.length > 0) {
             data.forEach((instruction) => {
+              instruction.timestamp_client = Date.now()
+              // console.log("timestamps =", instruction.timestamp_rasp, instruction.timestamp_client)
+              // console.log("supposed latency =", instruction.timestamp_client - instruction.timestamp_rasp)
+              const supposedLatency = instruction.timestamp_client - instruction.timestamp_rasp
               // check if he is logged in the posxy array
               // if hes not initialise le
               // if he is, just add the acceleration to the pos
               // console.log(instruction.client)
               if (!(instruction.client in mouseCursors)) {
-                mouseCursors[instruction.client] = { coords: { x: 1000, y: 1000 } }
+                mouseCursors[instruction.client] = { coords: { x: 1000, y: 1000 }, latency: [supposedLatency] }
               } else {
                 mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
                 mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
+                mouseCursors[instruction.client].latency.push(supposedLatency)
               }
             })
           }
-
-          // // est ce qu'on a déjà une mémoire pour ce device?
-          // if (id != "undefined_undefined" || id == undefined) {
-          //   if (!(id in mouseCursors)) {
-          //     // si non, initialise le
-          //     mouseCursors[id] = { coords: { x: 1000, y: 1000 } }
-          //   }
-
-          // // latency between rasp & serv DOES NOT WORK! we're getting negative numbers... wtf
-
-          // console.log("R", data.timestamp_RASP, " S", data.timestamp_SERVER)
-          // const raspServLag = data.timestamp_SERVER - data.timestamp_RASP
-          // // console.log("raspLag ", raspServLag)
-          // const servClientLag = data.timestamp_CLIENT - data.timestamp_SERVER
-          // const totalLatency = raspServLag + servClientLag
-          // // console.log(totalLatency)
-          // // latency between serv & client
-          // mouseCursors[id].latency = totalLatency
-          // }
-
-          // on ajoute a un tableau qui sera vidé à 60Hz
-
-          // switch (data.code) {
-          //   case "REL_X":
-          //     mouseCursors[id].coords.x = mouseCursors[id].coords.x + data.value
-          //     break
-          //   case "REL_Y":
-          //     mouseCursors[id].coords.y = mouseCursors[id].coords.y + data.value
-          //     break
-
-          //   default:
-          //     // console.log("unknown event code")
-          //     break
-          // }
         }
 
         ws.onerror = (error) => {
@@ -139,10 +110,10 @@
 
       function draw() {
         background(255)
-        // text("la latence est exprimée en milisecondes entre le moment où l'evenement est simulé côté rasp et le moment où il est reçu côté client JS. La majorité de la latence est entre les rasp & le serveur.", 10, 10, 200, 200)
+        text("la latence est exprimée en milisecondes entre le moment où l'evenement est simulé côté rasp et le moment où il est reçu côté client JS. La majorité de la latence est entre les rasp & le serveur.", 10, 10, 200, 200)
 
         text("messages recieved " + msg + "/s", 200, 10, 100, 100)
-        text("max drop " + maxDrop, 300, 10, 200, 200)
+        text("max drop between server & client" + maxDrop, 300, 10, 200, 200)
 
         // Draw each cursor on the canvas
         for (let client in mouseCursors) {
@@ -150,12 +121,57 @@
           fill(0, 0, 0, 150) // Set color for the cursor (blue with transparency)
           image(img, cursor.coords.x / 3, cursor.coords.y / 3, 32, 50)
           // text(mouseCursors[id].latency + " ms", mouseCursors[id].coords.x / 3, mouseCursors[id].coords.y / 3)
+          text(Math.max(...mouseCursors[client].latency) + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3, 25, 25)
         }
       }
 
       function windowResized() {
         resizeCanvas(windowWidth, windowHeight)
       }
+
+      // class LatencyCalculator {
+      //   constructor() {
+      //     this.totalLatency = 0
+      //     this.maxLatency = 0
+      //     this.count = 0
+      //   }
+
+      //   /**
+      //    * Processes an incoming data object with `timestamp_rasp` and `timestamp_client`.
+      //    * Updates mean latency and maximum latency (jitter).
+      //    * @param {Object} data - An object containing `timestamp_rasp` and `timestamp_client`.
+      //    */
+      //   processData(data) {
+      //     if (!data.timestamp_rasp || !data.timestamp_client) {
+      //       throw new Error("Data object must contain timestamp_rasp and timestamp_client")
+      //     }
+
+      //     const latency = data.timestamp_rasp - data.timestamp_client
+
+      //     // Update statistics
+      //     this.totalLatency += latency
+      //     this.count++
+      //     if (latency > this.maxLatency) {
+      //       this.maxLatency = latency
+      //     }
+      //   }
+
+      //   /**
+      //    * Returns the mean latency.
+      //    * @returns {number} - Mean latency in milliseconds.
+      //    */
+      //   getMeanLatency() {
+      //     return this.count > 0 ? this.totalLatency / this.count : 0
+      //   }
+
+      //   /**
+      //    * Returns the maximum latency (jitter).
+      //    * @returns {number} - Maximum latency in milliseconds.
+      //    */
+      //   getMaxLatency() {
+      //     return this.maxLatency
+      //   }
+      // }
     </script>
   </body>
 </html>
