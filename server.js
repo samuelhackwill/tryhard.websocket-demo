@@ -140,4 +140,4 @@ setInterval(() => {
       client.send(JSON.stringify(cleanData)) // Send mouse event data to HTML clients
     }
   })
-}, 1000 / 20)
+}, 1000 / 60)

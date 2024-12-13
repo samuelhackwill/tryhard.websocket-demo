@@ -17,6 +17,39 @@ async def simulate_mouse_events(queue):
     print(f"Simulating {len(simulated_devices)} devices...")
 
     async def generate_events(device_name):
+        direction = 1  # 1 for right, -1 for left
+        distance = 0  # Tracks the current distance moved in the current direction
+        max_distance = 600  # Maximum distance to move in one direction
+
+        while True:
+            await asyncio.sleep(1 / 20)  # 60 Hz
+
+            # Move by 5 pixels per frame in the current direction
+            x_movement = direction * 5
+            distance += abs(x_movement)
+
+            # Reverse direction if the max distance is reached
+            if distance >= max_distance:
+                direction *= -1
+                distance = 0
+
+            await queue.put({
+                "rasp": raspName,
+                "client": f"{raspName}_{device_name}",
+                "event_type": "motion",
+                "x": x_movement,
+                "y": 0,  # No vertical movement
+                "timestamp_rasp": int(round(time.time() * 1000))
+            })
+
+    tasks = [asyncio.create_task(generate_events(device)) for device in simulated_devices]
+    await asyncio.gather(*tasks)
+
+    """Simulate mouse events from four virtual devices."""
+    simulated_devices = [f"simulatedMouse-{i}" for i in range(1, 5)]
+    print(f"Simulating {len(simulated_devices)} devices...")
+
+    async def generate_events(device_name):
         while True:
             await asyncio.sleep(1 / 60)  # 60 Hz
             x_movement = random.randint(-10, 10)

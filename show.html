@@ -89,7 +89,7 @@
               // if he is, just add the acceleration to the pos
               // console.log(instruction.client)
               if (!(instruction.client in mouseCursors)) {
-                mouseCursors[instruction.client] = { coords: { x: 1000, y: 1000 }, latency: [supposedLatency] }
+                mouseCursors[instruction.client] = { coords: { x: Math.floor(Math.random() * 3000) + 600, y: Math.floor(Math.random() * 2000) + 200 }, latency: [supposedLatency] }
               } else {
                 mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
                 mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
@@ -110,6 +110,7 @@
 
       function draw() {
         background(255)
+        fill(0, 0, 0)
         text("la latence est exprimée en milisecondes entre le moment où l'evenement est simulé côté rasp et le moment où il est reçu côté client JS. La majorité de la latence est entre les rasp & le serveur.", 10, 10, 200, 200)
 
         text("messages recieved " + msg + "/s", 200, 10, 100, 100)
@@ -118,10 +119,20 @@
         // Draw each cursor on the canvas
         for (let client in mouseCursors) {
           const cursor = mouseCursors[client]
-          fill(0, 0, 0, 150) // Set color for the cursor (blue with transparency)
           image(img, cursor.coords.x / 3, cursor.coords.y / 3, 32, 50)
-          // text(mouseCursors[id].latency + " ms", mouseCursors[id].coords.x / 3, mouseCursors[id].coords.y / 3)
-          text(Math.max(...mouseCursors[client].latency) + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3, 25, 25)
+
+          // Calculate the maximum latency for the client
+          let maxLatency = Math.max(...cursor.latency)
+
+          // Set text color based on latency threshold
+          if (maxLatency > 100) {
+            fill(255, 0, 0) // Red for latency > 100ms
+          } else {
+            fill(0, 255, 0) // Black for latency <= 100ms
+          }
+
+          // Display the maximum latency near the cursor
+          text(maxLatency + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3, 25, 25)
         }
       }
 
