@@ -79,7 +79,7 @@
           // console.log(data)
 
           if (data.length > 0) {
-            data.forEach((instruction) => {
+            data.forEach((instruction, index) => {
               instruction.timestamp_client = Date.now()
               // console.log("timestamps =", instruction.timestamp_rasp, instruction.timestamp_client)
               // console.log("supposed latency =", instruction.timestamp_client - instruction.timestamp_rasp)
@@ -87,9 +87,17 @@
               // check if he is logged in the posxy array
               // if hes not initialise le
               // if he is, just add the acceleration to the pos
-              // console.log(instruction.client)
+
               if (!(instruction.client in mouseCursors)) {
-                mouseCursors[instruction.client] = { coords: { x: Math.floor(Math.random() * 3000) + 600, y: Math.floor(Math.random() * 2000) + 200 }, latency: [supposedLatency] }
+                // hmmmm we want to order the rasps using their id number
+                const regex = /th(\d{0,})/
+                thIndex = regex.exec(instruction.client)[1]
+                mouseCursors[instruction.client] = { coords: { x: 2000, y: index * 40 + 200 }, latency: [supposedLatency] }
+                // for logging purposes, it's nice to know which cursor is which rasp oh yeah
+                // let's use regex to decompose the client name "th1_mouse-HP-thingy"
+                // rather than sending a proper objet in the first place (sounds smart)
+                mouseCursors[instruction.client].rasp = instruction.client.match("(.+)_(.+)")[1]
+                mouseCursors[instruction.client].device = instruction.client.match("(.+)_(.+)")[2]
               } else {
                 mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
                 mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
@@ -111,7 +119,7 @@
       function draw() {
         background(255)
         fill(0, 0, 0)
-        text("la latence est exprimée en milisecondes entre le moment où l'evenement est simulé côté rasp et le moment où il est reçu côté client JS. La majorité de la latence est entre les rasp & le serveur.", 10, 10, 200, 200)
+        text("the following THs are connected to 2,4GHz : 2, 6, 7, 10, 11. The follwing TH is connected to ETH : 11", 10, 10, 150, 200)
 
         text("messages recieved " + msg + "/s", 200, 10, 100, 100)
         text("max drop between server & client" + maxDrop, 300, 10, 200, 200)
@@ -131,8 +139,7 @@
             fill(0, 255, 0) // Black for latency <= 100ms
           }
 
-          // Display the maximum latency near the cursor
-          text(maxLatency + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3, 25, 25)
+          text(mouseCursors[client].rasp + ", lat " + maxLatency + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3 - 15, 100, 25)
         }
       }
 

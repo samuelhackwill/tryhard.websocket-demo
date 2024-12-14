@@ -19,13 +19,13 @@ async def simulate_mouse_events(queue):
     async def generate_events(device_name):
         direction = 1  # 1 for right, -1 for left
         distance = 0  # Tracks the current distance moved in the current direction
-        max_distance = 600  # Maximum distance to move in one direction
+        max_distance = 3000  # Maximum distance to move in one direction
 
         while True:
             await asyncio.sleep(1 / 20)  # 60 Hz
 
-            # Move by 5 pixels per frame in the current direction
-            x_movement = direction * 5
+            # Move by 10 pixels per frame in the current direction
+            x_movement = direction * 10
             distance += abs(x_movement)
 
             # Reverse direction if the max distance is reached
@@ -49,23 +49,23 @@ async def simulate_mouse_events(queue):
     simulated_devices = [f"simulatedMouse-{i}" for i in range(1, 5)]
     print(f"Simulating {len(simulated_devices)} devices...")
 
-    async def generate_events(device_name):
-        while True:
-            await asyncio.sleep(1 / 60)  # 60 Hz
-            x_movement = random.randint(-10, 10)
-            y_movement = random.randint(-10, 10)
+    # async def generate_events(device_name):
+    #     while True:
+    #         await asyncio.sleep(1 / 20)  # 60 Hz
+    #         x_movement = random.randint(-10, 10)
+    #         y_movement = random.randint(-10, 10)
 
-            await queue.put({
-                "rasp": raspName,
-                "client": f"{raspName}_{device_name}",
-                "event_type": "motion",
-                "x": x_movement,
-                "y": y_movement,
-                "timestamp_rasp": int(round(time.time() * 1000))
-            })
+    #         await queue.put({
+    #             "rasp": raspName,
+    #             "client": f"{raspName}_{device_name}",
+    #             "event_type": "motion",
+    #             "x": x_movement,
+    #             "y": y_movement,
+    #             "timestamp_rasp": int(round(time.time() * 1000))
+    #         })
 
-    tasks = [asyncio.create_task(generate_events(device)) for device in simulated_devices]
-    await asyncio.gather(*tasks)
+    # tasks = [asyncio.create_task(generate_events(device)) for device in simulated_devices]
+    # await asyncio.gather(*tasks)
 
 async def send_to_websocket(queue, server_uri):
     """Connect to the WebSocket server and send mouse events."""
@@ -151,7 +151,7 @@ async def monitor_mice(queue):
     async def flush_motion():
         """Send aggregated motion events at a fixed rate."""
         while True:
-            await asyncio.sleep(1 / 60)  # 60 Hz
+            await asyncio.sleep(1 / 20)  # 60 Hz
             for unique_id, motion in motion_aggregator.items():
                 if unique_id == "queue":  # Skip the queue key
                     continue
