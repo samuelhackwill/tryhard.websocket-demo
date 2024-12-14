@@ -22,7 +22,7 @@ async def simulate_mouse_events(queue):
         max_distance = 3000  # Maximum distance to move in one direction
 
         while True:
-            await asyncio.sleep(1 / 20)  # 60 Hz
+            await asyncio.sleep(1 / 60)  # 60 Hz
 
             # Move by 10 pixels per frame in the current direction
             x_movement = direction * 10
@@ -90,6 +90,10 @@ async def send_to_websocket(queue, server_uri):
                 asyncio.create_task(handle_pings())
 
                 while True:
+                    # queue_length = queue.qsize()  # Check queue length
+                    # print(f"Queue size ({queue_length} items).")
+                    # queue never grows larger than 1 
+
                     data = await queue.get()
                     json_data = json.dumps(data)
                     await websocket.send(json_data)
@@ -151,7 +155,7 @@ async def monitor_mice(queue):
     async def flush_motion():
         """Send aggregated motion events at a fixed rate."""
         while True:
-            await asyncio.sleep(1 / 20)  # 60 Hz
+            await asyncio.sleep(1 / 60)  # 60 Hz
             for unique_id, motion in motion_aggregator.items():
                 if unique_id == "queue":  # Skip the queue key
                     continue

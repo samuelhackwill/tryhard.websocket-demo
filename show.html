@@ -17,13 +17,13 @@
     <script>
       let msg = NaN
       let msgperseccounter = 0
-      let dropped = false
-      let droppedDuration = 0
-      let droppedCollection = []
-      let maxDrop = 0
       let img
       let mouseCursors = {} // Object to store mouse cursor positions by device ID
       // Load the image.
+
+      // this is to compensate for my bogus latency readings lol
+      let negativeLagHackCompensation = 0
+
       function preload() {
         img = loadImage("/cursor.png")
       }
@@ -32,36 +32,24 @@
         // console.log("messages per second ", msgperseccounter)
         msg = msgperseccounter
         msgperseccounter = 0
-      }, 1000)
 
-      setInterval(function () {
-        // check if you have gotten a new message. if so,
-        if (dropped) {
-          droppedDuration++
-        } else {
-          droppedCollection.push(droppedDuration)
-          droppedDuration = 0
-          dropped = true
-          maxDrop = Math.max(...droppedCollection)
+        for (const [key, obj] of Object.entries(mouseCursors)) {
+          const sum = obj.latency.reduce((partialSum, a) => partialSum + a, 0)
+          const avg = Math.round(sum / obj.latency.length)
+          const max = Math.max(...obj.latency)
+          if (!obj.maxLatency || obj.maxLatency < max) {
+            obj.maxLatency = max
+          }
+
+          obj.avgLatency = avg
+          obj.latency = []
         }
-        // add number to highscore array and
-        // reset counter.
-        // if not, add 1 to counter
-        // always display biggest number
-      }, 1)
+      }, 1000)
 
       function setup() {
         // Load the image.
         createCanvas(windowWidth, windowHeight)
         noStroke()
-        let button = createButton("reset maxDrop")
-        button.position(300, 50)
-
-        // Call repaint() when the button is pressed.
-        button.mousePressed(function () {
-          droppedCollection = []
-          maxDrop = 0
-        })
 
         // Connect to the WebSocket server
         const ws = new WebSocket("ws://localhost:8080")
@@ -84,6 +72,13 @@
               // console.log("timestamps =", instruction.timestamp_rasp, instruction.timestamp_client)
               // console.log("supposed latency =", instruction.timestamp_client - instruction.timestamp_rasp)
               const supposedLatency = instruction.timestamp_client - instruction.timestamp_rasp
+
+              if (negativeLagHackCompensation == 0 && supposedLatency < 0) {
+                negativeLagHackCompensation = -supposedLatency
+              }
+
+              const compensatedLatency = supposedLatency + negativeLagHackCompensation
+
               // check if he is logged in the posxy array
               // if hes not initialise le
               // if he is, just add the acceleration to the pos
@@ -92,7 +87,7 @@
                 // hmmmm we want to order the rasps using their id number
                 const regex = /th(\d{0,})/
                 thIndex = regex.exec(instruction.client)[1]
-                mouseCursors[instruction.client] = { coords: { x: 2000, y: index * 40 + 200 }, latency: [supposedLatency] }
+                mouseCursors[instruction.client] = { coords: { x: 2000, y: index * 55 + 100 }, latency: [compensatedLatency] }
                 // for logging purposes, it's nice to know which cursor is which rasp oh yeah
                 // let's use regex to decompose the client name "th1_mouse-HP-thingy"
                 // rather than sending a proper objet in the first place (sounds smart)
@@ -101,7 +96,7 @@
               } else {
                 mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
                 mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
-                mouseCursors[instruction.client].latency.push(supposedLatency)
+                mouseCursors[instruction.client].latency.push(compensatedLatency)
               }
             })
           }
@@ -119,10 +114,10 @@
       function draw() {
         background(255)
         fill(0, 0, 0)
-        text("the following THs are connected to 2,4GHz : 2, 6, 7, 10, 11. The follwing TH is connected to ETH : 11", 10, 10, 150, 200)
+        text("everybody's using eth and same timeserver.", 10, 10, 150, 200)
 
         text("messages recieved " + msg + "/s", 200, 10, 100, 100)
-        text("max drop between server & client" + maxDrop, 300, 10, 200, 200)
+        // text("max drop between server & client" + maxDrop, 300, 10, 200, 200)
 
         // Draw each cursor on the canvas
         for (let client in mouseCursors) {
@@ -130,7 +125,7 @@
           image(img, cursor.coords.x / 3, cursor.coords.y / 3, 32, 50)
 
           // Calculate the maximum latency for the client
-          let maxLatency = Math.max(...cursor.latency)
+          let maxLatency = cursor.maxLatency
 
           // Set text color based on latency threshold
           if (maxLatency > 100) {
@@ -139,57 +134,13 @@
             fill(0, 255, 0) // Black for latency <= 100ms
           }
 
-          text(mouseCursors[client].rasp + ", lat " + maxLatency + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3 - 15, 100, 25)
+          text(cursor.rasp + ", avgP " + cursor.avgLatency + "ms" + ", maxP " + maxLatency + "ms", cursor.coords.x / 3 + 20, cursor.coords.y / 3 + 20, 200, 25)
         }
       }
 
       function windowResized() {
         resizeCanvas(windowWidth, windowHeight)
       }
-
-      // class LatencyCalculator {
-      //   constructor() {
-      //     this.totalLatency = 0
-      //     this.maxLatency = 0
-      //     this.count = 0
-      //   }
-
-      //   /**
-      //    * Processes an incoming data object with `timestamp_rasp` and `timestamp_client`.
-      //    * Updates mean latency and maximum latency (jitter).
-      //    * @param {Object} data - An object containing `timestamp_rasp` and `timestamp_client`.
-      //    */
-      //   processData(data) {
-      //     if (!data.timestamp_rasp || !data.timestamp_client) {
-      //       throw new Error("Data object must contain timestamp_rasp and timestamp_client")
-      //     }
-
-      //     const latency = data.timestamp_rasp - data.timestamp_client
-
-      //     // Update statistics
-      //     this.totalLatency += latency
-      //     this.count++
-      //     if (latency > this.maxLatency) {
-      //       this.maxLatency = latency
-      //     }
-      //   }
-
-      //   /**
-      //    * Returns the mean latency.
-      //    * @returns {number} - Mean latency in milliseconds.
-      //    */
-      //   getMeanLatency() {
-      //     return this.count > 0 ? this.totalLatency / this.count : 0
-      //   }
-
-      //   /**
-      //    * Returns the maximum latency (jitter).
-      //    * @returns {number} - Maximum latency in milliseconds.
-      //    */
-      //   getMaxLatency() {
-      //     return this.maxLatency
-      //   }
-      // }
     </script>
   </body>
 </html>

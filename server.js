@@ -136,7 +136,7 @@ setInterval(() => {
   htmlClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       cleanData = mergeQueue(queue)
-      console.log(cleanData)
+      // console.log(cleanData)
       client.send(JSON.stringify(cleanData)) // Send mouse event data to HTML clients
     }
   })
