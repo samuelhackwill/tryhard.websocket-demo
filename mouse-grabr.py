@@ -177,7 +177,7 @@ async def monitor_mice(queue):
 
 async def main():
     queue = asyncio.Queue()
-    server_uri = "ws://192.168.1.64:8080"
+    server_uri = "ws://192.168.1.81:8080"
 
     if len(sys.argv) > 1 and sys.argv[1] == "simulate":
         print("Running in simulation mode.")

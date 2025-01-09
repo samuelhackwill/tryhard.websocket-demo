@@ -16,7 +16,7 @@
 
     - name: Copy mouse-grabr.py script to Desktop
       ansible.builtin.copy:
-        src: /Users/samuel/htdocs/tryhard/websocket-demo/mouse-grabr.py
+        src: /Users/samuel/htdocs/tryhard/tryhard.websocket-demo/mouse-grabr.py
         dest: /home/sam/Desktop/mouse-grabr.py
         owner: sam
         mode: "0755"
