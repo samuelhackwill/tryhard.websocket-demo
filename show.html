@@ -21,9 +21,6 @@
       let mouseCursors = {} // Object to store mouse cursor positions by device ID
       // Load the image.
 
-      // this is to compensate for my bogus latency readings lol
-      let negativeLagHackCompensation = 0
-
       function preload() {
         img = loadImage("/cursor.png")
       }
@@ -52,7 +49,7 @@
         noStroke()
 
         // Connect to the WebSocket server
-        const ws = new WebSocket("ws://localhost:8080")
+        const ws = new WebSocket("ws://192.168.1.81:8080")
 
         ws.onopen = () => {
           console.log("Connected to WebSocket server")
@@ -73,12 +70,6 @@
               // console.log("supposed latency =", instruction.timestamp_client - instruction.timestamp_rasp)
               const supposedLatency = instruction.timestamp_client - instruction.timestamp_rasp
 
-              if (negativeLagHackCompensation == 0 && supposedLatency < 0) {
-                negativeLagHackCompensation = -supposedLatency
-              }
-
-              const compensatedLatency = supposedLatency + negativeLagHackCompensation
-
               // check if he is logged in the posxy array
               // if hes not initialise le
               // if he is, just add the acceleration to the pos
@@ -87,7 +78,7 @@
                 // hmmmm we want to order the rasps using their id number
                 const regex = /th(\d{0,})/
                 thIndex = regex.exec(instruction.client)[1]
-                mouseCursors[instruction.client] = { coords: { x: 2000, y: index * 55 + 100 }, latency: [compensatedLatency] }
+                mouseCursors[instruction.client] = { coords: { x: 2000, y: index * 55 + 100 }, latency: [supposedLatency] }
                 // for logging purposes, it's nice to know which cursor is which rasp oh yeah
                 // let's use regex to decompose the client name "th1_mouse-HP-thingy"
                 // rather than sending a proper objet in the first place (sounds smart)
@@ -96,7 +87,7 @@
               } else {
                 mouseCursors[instruction.client].coords.x = mouseCursors[instruction.client].coords.x + instruction.x
                 mouseCursors[instruction.client].coords.y = mouseCursors[instruction.client].coords.y + instruction.y
-                mouseCursors[instruction.client].latency.push(compensatedLatency)
+                mouseCursors[instruction.client].latency.push(supposedLatency)
               }
             })
           }
