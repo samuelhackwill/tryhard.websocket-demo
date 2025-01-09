@@ -1,3 +1,4 @@
 /node_modules
 .DS_Store
-/ansible
+/ansible/secrets.yml
+/ansible/secrets_pwd.txt
