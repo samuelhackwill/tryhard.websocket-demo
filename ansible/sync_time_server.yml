@@ -1,4 +1,5 @@
 ---
+# ça a l'air d'être daubé tout ça
 - name: Configure Chrony with Apple Europe time server
   hosts: thRasps
   user: sam # Replace with your actual user

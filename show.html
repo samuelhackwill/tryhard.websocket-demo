@@ -20,6 +20,7 @@
       let img
       let mouseCursors = {} // Object to store mouse cursor positions by device ID
       // Load the image.
+      let zoom = 1
 
       function preload() {
         img = loadImage("/cursor.png")
@@ -49,7 +50,7 @@
         noStroke()
 
         // Connect to the WebSocket server
-        const ws = new WebSocket("ws://192.168.1.81:8080")
+        const ws = new WebSocket("ws://localhost:8080")
 
         ws.onopen = () => {
           console.log("Connected to WebSocket server")
@@ -65,10 +66,10 @@
 
           if (data.length > 0) {
             data.forEach((instruction, index) => {
-              instruction.timestamp_client = Date.now()
+              timestamp_client = Date.now()
               // console.log("timestamps =", instruction.timestamp_rasp, instruction.timestamp_client)
               // console.log("supposed latency =", instruction.timestamp_client - instruction.timestamp_rasp)
-              const supposedLatency = instruction.timestamp_client - instruction.timestamp_rasp
+              const supposedLatency = timestamp_client - instruction.timestamp_rasp
 
               // check if he is logged in the posxy array
               // if hes not initialise le
@@ -100,6 +101,12 @@
         ws.onclose = () => {
           console.log("WebSocket connection closed")
         }
+
+        let button = createButton("zoom")
+        button.position(0, 100)
+
+        // Call repaint() when the button is pressed.
+        button.mousePressed(zoom)
       }
 
       function draw() {
@@ -113,7 +120,7 @@
         // Draw each cursor on the canvas
         for (let client in mouseCursors) {
           const cursor = mouseCursors[client]
-          image(img, cursor.coords.x / 3, cursor.coords.y / 3, 32, 50)
+          image(img, cursor.coords.x / 3, cursor.coords.y / 3, zoom * 32, zoom * 50)
 
           // Calculate the maximum latency for the client
           let maxLatency = cursor.maxLatency
@@ -131,6 +138,10 @@
 
       function windowResized() {
         resizeCanvas(windowWidth, windowHeight)
+      }
+
+      function zoom() {
+        zoom = 10
       }
     </script>
   </body>
